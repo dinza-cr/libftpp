@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <vector>
 #include <utility>
+#include <stdexcept>
 
 template <typename TType>
 class Pool {
@@ -10,26 +11,20 @@ class Pool {
 	    class Object;
 
 		Pool() : _memory(nullptr), _capacity(0) {}
+		~Pool();
 
-		~Pool()	{
-			if (_memory != nullptr) {
-				delete(_memory);
-				_memory = nullptr;
-			}
-		}
-
-        void resize(const size_t& numberOfObjectStored); // a faire
+        void resize(const size_t& numberOfObjectStored);
 
         template <typename... TArgs>
-        Object acquire(TArgs&&... p_args); // a faire
+        Object acquire(TArgs&&... p_args);
+
+		Pool(const Pool&) = delete;
+		Pool& operator=(const Pool&) = delete;
 
     private:
 		TType* getPtr(size_t index) { return (_memory + index); }
 
-		void releaseObject(size_t index) {
-			getPtr(index)->~TType();
-			_freeIndices.push_back(index);
-		}
+		void releaseObject(size_t index) ;
 
         TType*				_memory;
         size_t				_capacity;
@@ -44,61 +39,22 @@ class Pool<TType>::Object {
 		Object(const Object&) = delete;
 		Object& operator=(const Object&) = delete;
 
-		Object(Object&& other) noexcept : _pool(other._pool), _index(other._index) {
-			other._pool = nullptr;
-		}
+		Object(Object&& other) noexcept : _pool(other._pool), _index(other._index) { other._pool = nullptr; }
 
-		Object& operator=(Object&& other) noexcept {
-			if (this != &other)
-			{
-				release();
-				_pool = other._pool;
-				_index = other._index;
+		Object& operator=(Object&& other) noexcept ;
 
-				other._pool = nullptr;
-			}
-			return (*this);
-		}
-
-		~Object() {
-			release();
-		}
+		~Object() { release(); }
 		
-		TType* operator->() {
-			return( _pool->getPtr(_index));
-		}
+		TType* operator->() { return( _pool->getPtr(_index)); }
 	
 	private:
 		friend class Pool<TType>;
 		Object(Pool<TType>* pool, size_t index) : _pool(pool), _index(index) {}
 
-		void release() {
-			if (_pool != nullptr) {
-				_pool->releaseObject(_index);
-				_pool = nullptr;
-			}
-		}
+		void release();
 
 		Pool<TType>*	_pool;
 		size_t			_index;
 };
 
-
-template <typename TType>
-void Pool<TType>::resize(const size_t& numberOfObjectStored) {
-    if (_memory != nullptr) {
-        ::operator delete(_memory);
-        _memory = nullptr;
-        _freeIndices.clear();
-        _capacity = 0;
-    }
-
-    if (numberOfObjectStored > 0) {
-        _memory = static_cast<TType*>(::operator new(numberOfObjectStored * sizeof(TType)));
-        _capacity = numberOfObjectStored;
-        _freeIndices.reserve(numberOfObjectStored);
-        for (size_t i = 0; i < numberOfObjectStored; ++i) {
-            _freeIndices.push_back(i);
-        }
-    }
-}
+#include "pool.tpp"
